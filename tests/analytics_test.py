@@ -1,15 +1,20 @@
-"""Tests for the pandas ``DataProcessor``."""
+"""Tests for the pandas ``DataProcessor`` and the ``ReportGenerator``."""
 
 from __future__ import annotations
 
+import csv
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import pytest
+from openpyxl import load_workbook
 
 from src.db.manager import DatabaseManager
+from src.exceptions import ReportGenerationError
 from src.processing.analytics import DataProcessor
+from src.reporting.generator import ReportGenerator
 
 
 @pytest.fixture
@@ -255,3 +260,85 @@ def test_from_database(tmp_path: Path) -> None:
     assert processor.top_authors().iloc[0]["author"] == "Frank Herbert"
     assert processor.benchmark_summary()["mean_speedup"] == pytest.approx(2.0)
     assert processor.cache_hit_ratio == 0.0
+
+
+def fixed_clock() -> datetime:
+    """Return a fixed date for predictable report file names."""
+    return datetime(2026, 10, 16, 9, 30)
+
+
+def test_report_generator_creates_three_files(processor: DataProcessor, tmp_path: Path) -> None:
+    """Excel, CSV and JSON files are created in a new output folder with dated names."""
+    output = tmp_path / "outputs" / "nested"
+    paths = ReportGenerator(output, clock=fixed_clock).generate_all(processor)
+    assert paths["excel"].name == "library_report_20261016.xlsx"
+    assert paths["csv"].name == "library_summary_20261016.csv"
+    assert paths["json"].name == "library_export_20261016.json"
+    assert all(path.is_file() and path.parent == output for path in paths.values())
+
+
+def test_excel_report_sheets_and_formatting(processor: DataProcessor, tmp_path: Path) -> None:
+    """The workbook has every sheet, styled frozen headers, autofilters and a chart."""
+    path = ReportGenerator(tmp_path, clock=fixed_clock).export_excel(processor)
+    workbook = load_workbook(path)
+    assert workbook.sheetnames == [
+        "Summary",
+        "Works",
+        "Top Years",
+        "Languages",
+        "Authors",
+        "Subjects",
+        "Benchmarks",
+    ]
+    works = workbook["Works"]
+    header = works["A1"]
+    assert header.font.bold and header.font.color.rgb.endswith("FFFFFF")
+    assert header.fill.fgColor.rgb.endswith("1F4E78")
+    assert works.freeze_panes == "A2"
+    assert works.auto_filter.ref == works.dimensions
+    assert works.column_dimensions["B"].width > 8
+    assert works.max_row == 5
+    summary = {row[1]: row[2] for row in workbook["Summary"].iter_rows(min_row=2, values_only=True)}
+    assert summary["Total Works"] == 4
+    assert workbook["Summary"]["C2"].alignment.horizontal == "right"
+    assert len(workbook["Top Years"]._charts) == 1
+    speedup_cell = workbook["Benchmarks"]["G2"]
+    assert speedup_cell.value == 4.0
+    assert speedup_cell.number_format == '0.00"x"'
+
+
+def test_csv_summary_contents(processor: DataProcessor, tmp_path: Path) -> None:
+    """The CSV summary lists years and languages with clear columns."""
+    path = ReportGenerator(tmp_path, clock=fixed_clock).export_csv_summary(processor)
+    with path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert list(rows[0]) == ["category", "value", "count"]
+    assert {"category": "publication_year", "value": "1965", "count": "2"} in rows
+    assert {"category": "language", "value": "eng", "count": "2"} in rows
+
+
+def test_json_export_is_minified(processor: DataProcessor, tmp_path: Path) -> None:
+    """The JSON export is minified UTF-8 with metadata and records."""
+    path = ReportGenerator(tmp_path, clock=fixed_clock).export_json(processor)
+    text = path.read_text(encoding="utf-8")
+    document = json.loads(text)
+    assert text == json.dumps(document, separators=(",", ":"), ensure_ascii=False)
+    assert "\n" not in text
+    assert "Cien años de soledad" in text
+    assert document["metadata"]["record_counts"]["works"] == 4
+    assert document["metadata"]["kpis"]["total_works"] == 4
+    assert len(document["records"]) == 4
+
+
+def test_empty_processor_reports(tmp_path: Path) -> None:
+    """Reports are still produced when the database is empty."""
+    paths = ReportGenerator(tmp_path, clock=fixed_clock).generate_all(DataProcessor([]))
+    assert all(path.is_file() for path in paths.values())
+
+
+def test_report_errors_are_wrapped(processor: DataProcessor, tmp_path: Path) -> None:
+    """An unusable output folder raises ``ReportGenerationError``."""
+    blocker = tmp_path / "not_a_folder"
+    blocker.write_text("x", encoding="utf-8")
+    with pytest.raises(ReportGenerationError):
+        ReportGenerator(blocker / "outputs").export_json(processor)
