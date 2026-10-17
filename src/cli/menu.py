@@ -661,7 +661,9 @@ class CLIApp:
                 ["Metric", "Value"],
                 [
                     ["Database file", metrics["db_path"]],
-                    ["File size", human_size(metrics["file_size_bytes"])],
+                    ["Database file size", human_size(metrics["file_size_bytes"])],
+                    ["WAL file size", human_size(metrics["wal_size_bytes"])],
+                    ["Total size on disk", human_size(metrics["total_size_bytes"])],
                     ["Page-based size", human_size(metrics["page_size_bytes"])],
                     ["Cache hits", cache["hits"]],
                     ["Cache misses", cache["misses"]],

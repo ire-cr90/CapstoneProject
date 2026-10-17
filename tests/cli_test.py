@@ -293,6 +293,7 @@ def test_option_5_admin_submenu(settings: Settings, tmp_path: Path) -> None:
     output = stream.getvalue()
     assert "api_cache" in output
     assert "Cache hit ratio" in output
+    assert "WAL file size" in output
     assert "Purged 0 expired cache entries." in output
     assert "t***@example.com" in output
     assert "tester@example.com" not in output

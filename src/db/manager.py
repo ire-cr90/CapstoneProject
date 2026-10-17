@@ -486,13 +486,18 @@ class DatabaseManager:
         expired = self._fetch_all(
             "SELECT COUNT(*) AS total FROM api_cache WHERE expires_at <= ?", (self._now(),)
         )[0]["total"]
-        file_size = 0
-        if self.db_path != MEMORY_DB and os.path.exists(self.db_path):
-            file_size = os.path.getsize(self.db_path)
+        file_size = wal_size = 0
+        if self.db_path != MEMORY_DB:
+            if os.path.exists(self.db_path):
+                file_size = os.path.getsize(self.db_path)
+            if os.path.exists(f"{self.db_path}-wal"):
+                wal_size = os.path.getsize(f"{self.db_path}-wal")
         return {
             "db_path": self.db_path,
             "row_counts": {table: self.count_rows(table) for table in TABLES},
             "file_size_bytes": file_size,
+            "wal_size_bytes": wal_size,
+            "total_size_bytes": file_size + wal_size,
             "page_size_bytes": page_count * page_size,
             "page_count": page_count,
             "cache": self.get_cache_stats(),

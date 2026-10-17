@@ -260,6 +260,8 @@ def test_get_metrics(db: DatabaseManager) -> None:
     assert metrics["row_counts"]["works"] == 1
     assert metrics["row_counts"]["authors"] == 1
     assert metrics["file_size_bytes"] > 0
+    assert metrics["wal_size_bytes"] > 0
+    assert metrics["total_size_bytes"] == metrics["file_size_bytes"] + metrics["wal_size_bytes"]
     assert metrics["page_size_bytes"] > 0
     assert metrics["cache"]["hit_ratio"] == 0.0
 
