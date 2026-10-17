@@ -68,10 +68,22 @@ def settings(tmp_path: Path) -> Settings:
     )
 
 
+CREATED_APPS: list[CLIApp] = []
+
+
+@pytest.fixture(autouse=True)
+def close_created_apps() -> Iterator[None]:
+    """Close the database connection of every app built during a test."""
+    yield
+    while CREATED_APPS:
+        CREATED_APPS.pop().close()
+
+
 def make_app(settings: Settings, *answers: str, **kwargs: Any) -> tuple[CLIApp, io.StringIO]:
     """Build an app with scripted answers and a captured output stream."""
     stream = io.StringIO()
     app = CLIApp(settings=settings, input_func=scripted(*answers), stream=stream, **kwargs)
+    CREATED_APPS.append(app)
     return app, stream
 
 
