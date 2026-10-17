@@ -248,7 +248,7 @@ def normalize_catalog_row(row: dict[str, Any], stats: CatalogStats | None = None
     for candidate in extract_isbns(fields.get("isbn") or fields.get("isbns")):
         isbn13 = to_isbn13(candidate)
         if isbn13 is None:
-            logger.warning("Dropping invalid ISBN %s for %r", candidate, title)
+            logger.info("Dropping invalid ISBN %s for %r", candidate, title)
             if stats is not None:
                 stats.invalid_isbns += 1
             continue
@@ -314,7 +314,7 @@ def stream_catalog(path: str | Path, stats: CatalogStats | None = None) -> Itera
                 raise DataValidationError("Row is not an object")
             record = normalize_catalog_row(raw, stats)
         except DataValidationError as exc:
-            logger.warning("Skipping %s line %d: %s", file_path.name, line_number, exc)
+            logger.info("Skipping %s line %d: %s", file_path.name, line_number, exc)
             if stats is not None:
                 stats.invalid_rows += 1
             continue
