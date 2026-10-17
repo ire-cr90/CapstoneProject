@@ -11,3 +11,6 @@ __pycache__/
 *.sqlite3
 data/outputs/*
 !data/outputs/.gitkeep
+.coverage
+.coverage.*
+htmlcov/
