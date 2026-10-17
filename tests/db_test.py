@@ -275,3 +275,10 @@ def test_in_memory_database() -> None:
     with DatabaseManager(":memory:") as manager:
         manager.upsert_work(make_work())
         assert manager.get_metrics()["file_size_bytes"] == 0
+
+
+def test_existing_work_keys(db: DatabaseManager) -> None:
+    """Only keys already stored are returned, using a single parameter."""
+    db.upsert_works_batch([make_work("OL1W"), make_work("OL2W")])
+    assert db.existing_work_keys(["OL1W", "OL9W", "OL2W", ""]) == {"OL1W", "OL2W"}
+    assert db.existing_work_keys([]) == set()

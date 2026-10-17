@@ -461,6 +461,17 @@ class DatabaseManager:
             )
         return int(cursor.lastrowid or 0)
 
+    def existing_work_keys(self, work_keys: Iterable[str]) -> set[str]:
+        """Return the subset of ``work_keys`` that already exist in ``works``."""
+        keys = sorted({key for key in work_keys if key})
+        if not keys:
+            return set()
+        rows = self._fetch_all(
+            "SELECT work_key FROM works WHERE work_key IN (SELECT value FROM json_each(?))",
+            (json.dumps(keys),),
+        )
+        return {row["work_key"] for row in rows}
+
     def count_rows(self, table: str) -> int:
         """Return the number of rows in one of the known tables."""
         if table not in TABLES:
