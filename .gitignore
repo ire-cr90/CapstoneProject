@@ -1,0 +1,13 @@
+.env
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.log
+*.log.*
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+data/outputs/*
+!data/outputs/.gitkeep
