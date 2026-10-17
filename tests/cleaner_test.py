@@ -274,4 +274,12 @@ def test_work_from_subject_work() -> None:
     assert work["authors"][0]["author_key"] == "OL22098A"
     assert work["isbns"] == ["9780306406157"]
     assert work["languages"] == []
+    assert work["first_publish_year"] == 1865
     assert work_from_subject_work({"title": "No key"}) is None
+
+
+def test_api_placeholder_year_zero_becomes_missing() -> None:
+    """Open Library sometimes reports year 0, which is stored as a missing year."""
+    raw = {"key": "/works/OL1W", "title": "Old Book", "first_publish_year": 0}
+    assert work_from_subject_work(raw)["first_publish_year"] is None
+    assert work_from_search_doc(raw)["first_publish_year"] is None

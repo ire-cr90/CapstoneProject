@@ -23,7 +23,7 @@ QueryType = Literal["isbn", "author", "title"]
 BOM = "﻿"
 DEFAULT_MAX_INPUT_LENGTH = 120
 MAX_SUBJECTS_PER_WORK = 25
-MIN_YEAR = 0
+MIN_YEAR = 1
 SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({".csv", ".json", ".jsonl"})
 LIST_SEPARATOR_PATTERN = re.compile(r"\s*[;|]\s*")
 UNSAFE_INPUT_PATTERN = re.compile(r"[^\w\s'.,:;&()!?\-]|_")
@@ -405,7 +405,7 @@ def work_from_search_doc(doc: dict[str, Any]) -> dict[str, Any] | None:
         "work_key": work_key,
         "title": title,
         "normalized_title": fold_text(title),
-        "first_publish_year": _int_or_none(doc.get("first_publish_year")),
+        "first_publish_year": _parse_year(doc.get("first_publish_year")),
         "languages": [normalize_text(code) for code in doc.get("language") or []],
         "isbns": _api_isbns(doc.get("isbn") or []),
         "subjects": _split_list(doc.get("subject") or [])[:MAX_SUBJECTS_PER_WORK],
@@ -432,7 +432,7 @@ def work_from_subject_work(work: dict[str, Any]) -> dict[str, Any] | None:
         "work_key": work_key,
         "title": title,
         "normalized_title": fold_text(title),
-        "first_publish_year": _int_or_none(work.get("first_publish_year")),
+        "first_publish_year": _parse_year(work.get("first_publish_year")),
         "languages": [],
         "isbns": _api_isbns([isbn] if isbn else []),
         "subjects": _split_list(work.get("subject") or [])[:MAX_SUBJECTS_PER_WORK],

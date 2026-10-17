@@ -207,6 +207,20 @@ def test_works_table_and_export_records(processor: DataProcessor) -> None:
     json.dumps(list(records.values()))
 
 
+def test_impossible_years_are_treated_as_missing() -> None:
+    """Year 0, negative years and future years count as missing."""
+    processor = DataProcessor(
+        [
+            {"work_key": "A", "title": "A", "first_publish_year": 0},
+            {"work_key": "B", "title": "B", "first_publish_year": -50},
+            {"work_key": "C", "title": "C", "first_publish_year": 9999},
+            {"work_key": "D", "title": "D", "first_publish_year": 1605},
+        ]
+    )
+    assert processor.missing_values_report()["first_publish_year"] == 3
+    assert processor.kpis()["oldest_year"] == 1605
+
+
 def test_empty_processor_is_safe() -> None:
     """An empty database produces empty results instead of errors."""
     processor = DataProcessor([])

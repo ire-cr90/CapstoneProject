@@ -42,7 +42,7 @@ BENCHMARK_COLUMNS: tuple[str, ...] = (
 )
 LIST_COLUMNS: tuple[str, ...] = ("languages", "isbns", "subjects")
 UNDETERMINED_LANGUAGE = "und"
-MIN_VALID_YEAR = 0
+MIN_VALID_YEAR = 1
 DEFAULT_TOP_N = 10
 
 TableData = pd.DataFrame | list[dict[str, Any]] | None
