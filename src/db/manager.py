@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-import unicodedata
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -16,6 +15,7 @@ from typing import Any, Self
 from src.config import get_settings
 from src.exceptions import DatabaseError, DataValidationError
 from src.logger import get_logger
+from src.processing.cleaner import fold_text
 
 logger = get_logger(__name__)
 
@@ -153,13 +153,6 @@ LIMIT ?
 """
 
 JSON_LIST_COLUMNS: tuple[str, ...] = ("languages", "isbns", "subjects")
-
-
-def fold_text(text: str) -> str:
-    """Return an accent-insensitive, case-insensitive form of ``text`` for matching."""
-    decomposed = unicodedata.normalize("NFKD", text)
-    stripped = "".join(char for char in decomposed if not unicodedata.combining(char))
-    return " ".join(stripped.split()).casefold()
 
 
 def _escape_like(value: str) -> str:

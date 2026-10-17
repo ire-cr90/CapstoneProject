@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from src.db.manager import TABLES, DatabaseManager, fold_text
+from src.db.manager import TABLES, DatabaseManager
 from src.exceptions import DatabaseError, DataValidationError
 
 
@@ -275,9 +275,3 @@ def test_in_memory_database() -> None:
     with DatabaseManager(":memory:") as manager:
         manager.upsert_work(make_work())
         assert manager.get_metrics()["file_size_bytes"] == 0
-
-
-def test_fold_text() -> None:
-    """Folding removes accents, collapses whitespace and lowercases."""
-    assert fold_text("  José   SARAMAGO ") == "jose saramago"
-    assert fold_text("Gabriel García") == "gabriel garcia"
