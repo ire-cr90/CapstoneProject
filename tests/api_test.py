@@ -371,3 +371,37 @@ async def test_async_cache_hit(settings: Settings) -> None:
             await client.search("dune")
         assert mocked.await_count == 1
         assert client.last_source == "cache"
+
+
+def test_sync_progress_callback_receives_each_page(client: SyncLibraryClient, sleep_mock) -> None:
+    """The progress callback is called once per page, in order, including failures."""
+    seen: list[tuple[int, bool]] = []
+    responses = [make_response(200, {"p": 1}), make_response(404)]
+    with patch.object(client._client, "get", side_effect=responses):
+        client.fetch_subject_pages(
+            "art", pages=2, progress=lambda result: seen.append((result.page, result.ok))
+        )
+    assert seen == [(1, True), (2, False)]
+
+
+async def test_async_progress_callback_receives_each_page(settings: Settings) -> None:
+    """The async progress callback fires for every page as it completes."""
+    seen: list[int] = []
+    async with AsyncLibraryClient(settings=settings) as client:
+        mocked = AsyncMock(return_value=make_response(200, {"works": []}))
+        with patch.object(client._client, "get", new=mocked):
+            results = await client.fetch_subject_pages(
+                "art", pages=3, progress=lambda result: seen.append(result.page)
+            )
+    assert sorted(seen) == [1, 2, 3]
+    assert [result.page for result in results] == [1, 2, 3]
+
+
+async def test_async_unexpected_error_is_collected(settings: Settings) -> None:
+    """An unexpected exception on one page becomes an ``APIError`` for that page only."""
+    async with AsyncLibraryClient(settings=settings) as client:
+        mocked = AsyncMock(side_effect=[make_response(200, {"p": 1}), RuntimeError("boom")])
+        with patch.object(client._client, "get", new=mocked):
+            results = await client.fetch_subject_pages("art", pages=2)
+    assert results[0].ok
+    assert isinstance(results[1].error, APIError)

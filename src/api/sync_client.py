@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -64,6 +65,9 @@ class PageResult:
     def ok(self) -> bool:
         """Return ``True`` when the page was fetched successfully."""
         return self.error is None
+
+
+PageProgress = Callable[[PageResult], None]
 
 
 def build_cache_key(method: str, url: str, params: dict[str, Any] | None = None) -> str:
@@ -277,6 +281,7 @@ class SyncLibraryClient:
         pages: int,
         limit: int = DEFAULT_PAGE_LIMIT,
         refresh: bool = False,
+        progress: PageProgress | None = None,
     ) -> list[PageResult]:
         """Fetch ``pages`` consecutive subject pages one after another, collecting errors."""
         if pages < 1:
@@ -287,11 +292,13 @@ class SyncLibraryClient:
                 data = self.get_subject(
                     subject, limit=limit, offset=(page - 1) * limit, refresh=refresh
                 )
+                result = PageResult(page=page, data=data)
             except LibraryAppError as exc:
                 logger.error("Page %d of subject %r failed: %s", page, subject, exc)
-                results.append(PageResult(page=page, error=exc))
-                continue
-            results.append(PageResult(page=page, data=data))
+                result = PageResult(page=page, error=exc)
+            results.append(result)
+            if progress is not None:
+                progress(result)
         return results
 
     def _throttle(self) -> None:

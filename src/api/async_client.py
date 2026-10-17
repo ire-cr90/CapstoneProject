@@ -11,6 +11,7 @@ import httpx
 from src.api.sync_client import (
     DEFAULT_PAGE_LIMIT,
     DEFAULT_SEARCH_LIMIT,
+    PageProgress,
     PageResult,
     ResponseCache,
     ResponseSource,
@@ -114,30 +115,43 @@ class AsyncLibraryClient:
         pages: int,
         limit: int = DEFAULT_PAGE_LIMIT,
         refresh: bool = False,
+        progress: PageProgress | None = None,
     ) -> list[PageResult]:
         """Fetch all pages concurrently with ``asyncio.gather``, preserving page order."""
         if pages < 1:
             raise DataValidationError("Pages must be a positive integer")
-        outcomes = await asyncio.gather(
-            *(
-                self.get_subject(subject, limit=limit, offset=(page - 1) * limit, refresh=refresh)
-                for page in range(1, pages + 1)
-            ),
-            return_exceptions=True,
+        return list(
+            await asyncio.gather(
+                *(
+                    self._fetch_page(subject, page, limit, refresh, progress)
+                    for page in range(1, pages + 1)
+                )
+            )
         )
-        results: list[PageResult] = []
-        for page, outcome in enumerate(outcomes, start=1):
-            if isinstance(outcome, LibraryAppError):
-                logger.error("Page %d of subject %r failed: %s", page, subject, outcome)
-                results.append(PageResult(page=page, error=outcome))
-            elif isinstance(outcome, Exception):
-                logger.exception("Unexpected error on page %d", page, exc_info=outcome)
-                results.append(PageResult(page=page, error=APIError(str(outcome))))
-            elif isinstance(outcome, BaseException):
-                raise outcome
-            else:
-                results.append(PageResult(page=page, data=outcome))
-        return results
+
+    async def _fetch_page(
+        self,
+        subject: str,
+        page: int,
+        limit: int,
+        refresh: bool,
+        progress: PageProgress | None,
+    ) -> PageResult:
+        """Fetch one subject page and turn any failure into a ``PageResult`` error."""
+        try:
+            data = await self.get_subject(
+                subject, limit=limit, offset=(page - 1) * limit, refresh=refresh
+            )
+            result = PageResult(page=page, data=data)
+        except LibraryAppError as exc:
+            logger.error("Page %d of subject %r failed: %s", page, subject, exc)
+            result = PageResult(page=page, error=exc)
+        except Exception as exc:
+            logger.exception("Unexpected error on page %d of subject %r", page, subject)
+            result = PageResult(page=page, error=APIError(str(exc)))
+        if progress is not None:
+            progress(result)
+        return result
 
     async def _throttle(self) -> None:
         """Space out request start times so the rate stays under ``requests_per_second``."""
